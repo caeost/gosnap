@@ -135,6 +135,7 @@ func (gs *GoSnap) Write() {
 	}
 }
 
+var mkdirAll = os.MkdirAll
 var ioUtilWriteFile = ioutil.WriteFile
 
 func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) {
@@ -151,7 +152,7 @@ func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) {
 	finalPath := path.Join(gs.Destination, filePath)
 	fmt.Println("Writing file out at", finalPath)
 
-	os.MkdirAll(path.Dir(finalPath), os.ModePerm)
+	mkdirAll(path.Dir(finalPath), os.ModePerm)
 
 	ioUtilWriteFile(finalPath, file.Content, perm)
 }

@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-func TestTransformIgnoreArrayToMap(t *testing.T) {
-
-}
+// TODO replace with actual mock
+// shortcut to get a valid FileInfo value
+var testFileInfo, _ = os.Lstat("./gosnap_test.go")
 
 type transformToLocalPathStruct struct {
 	input  string
@@ -175,9 +175,6 @@ func mapKeys(mymap FileMapType) []string {
 	return keys
 }
 
-// shortcut to get a valid FileInfo value
-var testFileInfo, _ = os.Lstat("./gosnap_test.go")
-
 func TestRead(t *testing.T) {
 	oldIoUtilReadFile := ioUtilReadFile
 	oldFilepathWalk := filepathWalk
@@ -220,13 +217,123 @@ func TestRead(t *testing.T) {
 	}
 }
 
-func TestWrite(t *testing.T) {
-
+type writeFileStruct struct {
+	path        string
+	destination string
+	file        GoSnapFile
+	expected    writeResultStruct
 }
 
-func TestWriteFile(t *testing.T) {
-
+type writeResultStruct struct {
+	path    string
+	content []byte
+	perm    os.FileMode
 }
+
+var writeFileTests = []writeFileStruct{
+	{
+		"a/b.go",
+		"/aa",
+		GoSnapFile{Content: []byte("howdy"), FileInfo: testFileInfo},
+		writeResultStruct{path: "/aa/a/b.go", content: []byte("howdy"), perm: os.ModePerm},
+	},
+}
+
+func TodoTestWriteFile(t *testing.T) {
+	oldIoUtilWriteFile := ioUtilWriteFile
+	oldMkdirAll := mkdirAll
+
+	defer func() { ioUtilWriteFile = oldIoUtilWriteFile }()
+	defer func() { mkdirAll = oldMkdirAll }()
+
+	results := make([]writeResultStruct, len(writeFileTests))
+
+	index := 0
+	ioUtilWriteFile = func(path string, content []byte, perm os.FileMode) error {
+		results[index] = writeResultStruct{path: path, content: content, perm: perm}
+		return nil
+	}
+	mkdirAll = func(path string, perm os.FileMode) error {
+		return nil
+	}
+
+	for i, test := range writeFileTests {
+		index = i
+
+		site := GoSnap{
+			Destination: test.destination,
+		}
+
+		site.WriteFile(test.path, test.file)
+
+		if test.expected.path != results[i].path {
+			t.Error(
+				"Expected write to path", test.expected.path,
+				"in case", i,
+				"Instead got", results[i].path,
+			)
+		}
+		if !reflect.DeepEqual(test.expected.content, results[i].content) {
+			t.Error(
+				"Expected to write", test.expected.content,
+				"in case", i,
+				"Instead wrote", results[i].content,
+			)
+		}
+		if test.expected.perm != results[i].perm {
+			t.Error(
+				"Expected write with permissions", test.expected.perm,
+				"in case", i,
+				"Instead got", results[i].perm,
+			)
+		}
+	}
+}
+
+type writeStruct struct {
+	fileMap  FileMapType
+	expected []string
+}
+
+var writeTests = []writeStruct{
+	{
+		FileMapType{
+			"file.file":                         &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
+			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
+		},
+		[]string{
+			"file.file",
+			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go",
+		},
+	},
+}
+
+// func TodoTestWrite(t *testing.T) {
+// 	for i, test := range writeTests {
+// 		site := GoSnap{}
+
+// 		count := 0
+// 		results := make([]string, len(test.fileMap))
+
+// 		WriteFile = func(filePath string, file GoSnapFile) {
+// 			results[count] = filePath
+// 			count++
+// 		}
+
+// 		site.Write()
+
+// 		sort.Strings(test.expected)
+// 		sort.Strings(results)
+
+// 		if !reflect.DeepEqual(test.expected, results) {
+// 			t.Error(
+// 				"Expected to write out", test.expected,
+// 				"In case", i,
+// 				"Instead got", results,
+// 			)
+// 		}
+// 	}
+// }
 
 type useStruct struct {
 	initial  []Plugin
