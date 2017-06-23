@@ -111,6 +111,9 @@ func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) {
 
 	finalPath := path.Join(gs.Destination, filePath)
 	fmt.Println("Writing file out at", finalPath)
+
+	os.MkdirAll(path.Dir(finalPath), os.ModePerm)
+
 	ioutil.WriteFile(finalPath, file.Contents, perm)
 }
 
