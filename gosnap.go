@@ -59,8 +59,9 @@ func (gs *GoSnap) transformIgnoreArrayToMap() {
 		}
 	}
 }
-func (gs *GoSnap) transformToLocalPath(filePath string) string {
-	internalPath := strings.Replace(filePath, gs.Source, "", 1)
+func transformToLocalPath(filePath string, source string) string {
+	filePath = path.Clean(filePath)
+	internalPath := strings.Replace(filePath, source, "", 1)
 
 	if strings.HasPrefix(internalPath, "/") {
 		internalPath = strings.Replace(internalPath, "/", "", 1)
@@ -79,8 +80,8 @@ func (gs *GoSnap) Read() {
 	gs.FileMap = make(FileMapType)
 
 	readVisitor := func(filePath string, fileInfo os.FileInfo, err error) error {
-		if _, ignored := gs.IgnoreMap[filePath]; !ignored && !fileInfo.IsDir() {
-			internalPath := gs.transformToLocalPath(filePath)
+		if _, ignored := gs.IgnoreMap[filePath]; !ignored && fileInfo != nil && !fileInfo.IsDir() {
+			internalPath := transformToLocalPath(filePath, gs.Source)
 
 			fmt.Println("Reading file at", internalPath)
 			gs.FileMap[internalPath] = gs.ReadFile(filePath)
