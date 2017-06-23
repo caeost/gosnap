@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/caeost/gosnap"
 	"path"
-	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -24,7 +24,12 @@ func whatKey(fileMap gosnap.FileMapType) {
 }
 
 func main() {
-	directory, _ := filepath.Abs("./")
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("Could not figure out position of directory")
+	}
+
+	directory := path.Dir(filename)
 
 	site := gosnap.GoSnap{
 		Source:      path.Join(directory, "source"),
