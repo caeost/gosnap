@@ -94,7 +94,6 @@ func (gs *GoSnap) ReadFile(path string, fileInfo os.FileInfo) *GoSnapFile {
 
 func (gs *GoSnap) Write() {
 	for filePath, file := range gs.FileMap {
-		fmt.Println("Writing file out at", filePath)
 		gs.WriteFile(filePath, *file)
 	}
 }
@@ -110,7 +109,9 @@ func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) {
 		perm = file.FileInfo.Mode()
 	}
 
-	ioutil.WriteFile(path.Join(gs.Destination, filePath), file.Contents, perm)
+	finalPath := path.Join(gs.Destination, filePath)
+	fmt.Println("Writing file out at", finalPath)
+	ioutil.WriteFile(finalPath, file.Contents, perm)
 }
 
 func (gs *GoSnap) Use(plugin Plugin) {
