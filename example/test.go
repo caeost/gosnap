@@ -9,10 +9,18 @@ import (
 )
 
 func noHi(fileMap gosnap.FileMapType) {
-	for filePath, file := range fileMap {
-		result := strings.Replace(string(file.Contents[:]), "hi", "noooo", -1)
-		fmt.Println("Replacing hi in", filePath, "resulting in", result)
-		file.Contents = []byte(result)
+	for _, file := range fileMap {
+		result := strings.Replace(string(file.Content[:]), "hi", "noooo", -1)
+
+		file.Content = []byte(result)
+	}
+}
+
+func whatKey(fileMap gosnap.FileMapType) {
+	for fp, file := range fileMap {
+		if file.Data["key"] != nil {
+			file.Content = []byte("key: " + file.Data["key"].(string))
+		}
 	}
 }
 
@@ -23,7 +31,7 @@ func main() {
 		Source:      path.Join(directory, "source"),
 		Destination: path.Join(directory, "destination"),
 		Clean:       false,
-		Plugins:     []gosnap.Plugin{noHi},
+		Plugins:     []gosnap.Plugin{noHi, whatKey},
 	}
 
 	site.Build()

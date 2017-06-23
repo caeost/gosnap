@@ -1,7 +1,9 @@
 package gosnap
 
 import (
+	"bytes"
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"path"
@@ -11,15 +13,20 @@ import (
 	"strings"
 )
 
+// All the types its fit to print
 type Plugin func(FileMapType)
 
 type GoSnapFile struct {
-	Contents []byte
+	Content  []byte
 	FileInfo os.FileInfo
+	Data     map[interface{}]interface{}
 }
 
 type FileMapType map[string]*GoSnapFile
 
+type StringSet map[string]struct{}
+
+// Exposed API
 type GoSnapFunctionality interface {
 	Read()
 	ReadFile(string, os.FileInfo)
@@ -29,8 +36,7 @@ type GoSnapFunctionality interface {
 	Build()
 }
 
-type StringSet map[string]struct{}
-
+// Structure of the main object
 type GoSnap struct {
 	Source      string
 	Destination string
@@ -41,6 +47,7 @@ type GoSnap struct {
 	Plugins     []Plugin
 }
 
+// utility functions for reading
 func (gs *GoSnap) transformIgnoreArrayToMap() {
 	if gs.Ignore != nil {
 		gs.IgnoreMap = make(StringSet)
@@ -50,12 +57,11 @@ func (gs *GoSnap) transformIgnoreArrayToMap() {
 		}
 	}
 }
-
 func (gs *GoSnap) transformToLocalPath(filePath string) string {
 	internalPath := strings.Replace(filePath, gs.Source, "", 1)
 
-	if internalPath[1] == '/' {
-		internalPath = internalPath[1:]
+	if strings.HasPrefix(internalPath, "/") {
+		internalPath = strings.Replace(internalPath, "/", "", 1)
 	}
 
 	return internalPath
@@ -69,8 +75,8 @@ func (gs *GoSnap) Read() {
 
 	readVisitor := func(filePath string, fileInfo os.FileInfo, err error) error {
 		if _, ignored := gs.IgnoreMap[filePath]; !ignored && !fileInfo.IsDir() {
-
 			internalPath := gs.transformToLocalPath(filePath)
+
 			fmt.Println("Reading file at", internalPath)
 			FileMap[internalPath] = gs.ReadFile(filePath, fileInfo)
 		}
@@ -81,15 +87,38 @@ func (gs *GoSnap) Read() {
 	filepath.Walk(gs.Source, readVisitor)
 }
 
-func (gs *GoSnap) ReadFile(path string, fileInfo os.FileInfo) *GoSnapFile {
+func parseFrontmatter(data []byte) ([]byte, map[interface{}]interface{}) {
+	fmt.Println("parsing frontmatter", string(data))
+	if bytes.HasPrefix(data, []byte("---\n")) {
+		splits := bytes.SplitN(data, []byte("\n---\n"), 2)
 
+		if len(splits) != 2 {
+			panic("Incorrect frontmatter format")
+		}
+
+		frontmatterValues := make(map[interface{}]interface{})
+		err := yaml.Unmarshal(splits[0], frontmatterValues)
+
+		if err != nil {
+			panic(err)
+		}
+		return splits[1], frontmatterValues
+	} else {
+		fmt.Println("no parsing done")
+		return data, nil
+	}
+}
+
+func (gs *GoSnap) ReadFile(path string, fileInfo os.FileInfo) *GoSnapFile {
 	data, err := ioutil.ReadFile(path)
 
 	if err != nil {
 		panic(err)
 	}
 
-	return &GoSnapFile{Contents: data, FileInfo: fileInfo}
+	content, frontmatterValues := parseFrontmatter(data)
+
+	return &GoSnapFile{Content: content, Data: frontmatterValues, FileInfo: fileInfo}
 }
 
 func (gs *GoSnap) Write() {
@@ -114,7 +143,7 @@ func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) {
 
 	os.MkdirAll(path.Dir(finalPath), os.ModePerm)
 
-	ioutil.WriteFile(finalPath, file.Contents, perm)
+	ioutil.WriteFile(finalPath, file.Content, perm)
 }
 
 func (gs *GoSnap) Use(plugin Plugin) {
