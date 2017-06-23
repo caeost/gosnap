@@ -16,10 +16,12 @@ import (
 // All the types its fit to print
 type Plugin func(FileMapType)
 
+type FrontmatterValueType map[interface{}]interface{}
+
 type GoSnapFile struct {
 	Content  []byte
 	FileInfo os.FileInfo
-	Data     map[interface{}]interface{}
+	Data     FrontmatterValueType
 }
 
 type FileMapType map[string]*GoSnapFile
@@ -87,7 +89,7 @@ func (gs *GoSnap) Read() {
 	filepath.Walk(gs.Source, readVisitor)
 }
 
-func parseFrontmatter(data []byte) ([]byte, map[interface{}]interface{}) {
+func parseFrontmatter(data []byte) ([]byte, FrontmatterValueType) {
 	if bytes.HasPrefix(data, []byte("---\n")) {
 		splits := bytes.SplitN(data, []byte("\n---\n"), 2)
 
@@ -95,7 +97,7 @@ func parseFrontmatter(data []byte) ([]byte, map[interface{}]interface{}) {
 			panic("Incorrect frontmatter format")
 		}
 
-		frontmatterValues := make(map[interface{}]interface{})
+		frontmatterValues := make(FrontmatterValueType)
 		err := yaml.Unmarshal(splits[0], frontmatterValues)
 
 		if err != nil {

@@ -40,11 +40,18 @@ func TestParseFrontmatter(t *testing.T) {
 type readFileStruct struct {
 	path              string
 	content           []byte
-	frontmatterValues map[interface{}]interface{}
+	expectedContent   []byte
+	frontmatterValues FrontmatterValueType
 }
 
 var readFileTests = []readFileStruct{
-	{"a/file.html", []byte("hi\na/file.html\nbye\n"), nil},
+	{"an/empty/file.html", []byte(""), []byte(""), nil},
+	{"a/file.html", []byte("hi\na/file.html\nbye\n"), []byte("hi\na/file.html\nbye\n"), nil},
+	{"bile.html", []byte("---\nkey: value\n---\nblahblah"), []byte("blahblah"), FrontmatterValueType{"key": "value"}},
+	{"bile-arrays.html", []byte("---\nkey: [value]\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{"value"}}},
+	{"bile-arrays-other-format.html", []byte("---\nkey:\n - value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{"value"}}},
+	{"bile-maps.html", []byte("---\nkey:\n inner: value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": FrontmatterValueType{"inner": "value"}}},
+	{"bile-array-maps.html", []byte("---\nkey:\n - inner: value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{FrontmatterValueType{"inner": "value"}}}},
 }
 
 func TestReadFile(t *testing.T) {
@@ -52,16 +59,18 @@ func TestReadFile(t *testing.T) {
 
 	defer func() { ioUtilReadFile = oldReadFile }()
 
+	index := 0
 	ioUtilReadFile = func(path string) ([]byte, error) {
-		return []byte("hi\n" + path + "\nbye\n"), nil
+		return readFileTests[index].content, nil
 	}
 
-	for _, test := range readFileTests {
+	for i, test := range readFileTests {
+		index = i
 		site := GoSnap{}
 
 		file := site.ReadFile(test.path)
 
-		if !reflect.DeepEqual(file.Content, test.content) {
+		if !reflect.DeepEqual(file.Content, test.expectedContent) {
 			t.Error("Expected file", test.path,
 				"to contain:\n", string(test.content),
 				"instead got:\n", string(file.Content))
@@ -92,10 +101,16 @@ func a(fm FileMapType) {
 
 }
 
+func b(fm FileMapType) {
+
+}
+
 var useTests = []useStruct{
 	{nil, nil, nil},
 	{[]Plugin{a}, nil, []Plugin{a}},
 	{nil, []Plugin{a}, []Plugin{a}},
+	{[]Plugin{b}, []Plugin{a}, []Plugin{b, a}},
+	{[]Plugin{a}, []Plugin{b}, []Plugin{a, b}},
 }
 
 func containsSamePlugins(a []Plugin, b []Plugin) bool {
