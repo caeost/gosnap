@@ -12,8 +12,31 @@ func TestTransformIgnoreArrayToMap(t *testing.T) {
 
 }
 
-func TestTransformToLocalPath(t *testing.T) {
+type transformToLocalPathStruct struct {
+	input  string
+	source string
+	output string
+}
 
+var transformToLocalPathTests = []transformToLocalPathStruct{
+	{"/a/b/c/d", "/a/b/c", "d"},
+	{"/d", "", "d"},
+	{"/d", "/", "d"},
+	{"a/b//d", "a", "b/d"},
+}
+
+func TestTransformToLocalPath(t *testing.T) {
+	for i, test := range transformToLocalPathTests {
+		output := transformToLocalPath(test.input, test.source)
+
+		if output != test.output {
+			t.Error(
+				"Expected output", test.output,
+				"In case", i,
+				"instead got", output,
+			)
+		}
+	}
 }
 
 type readFileStruct struct {
@@ -59,6 +82,7 @@ func TestReadFile(t *testing.T) {
 		if !reflect.DeepEqual(file.Data, test.frontmatterValues) {
 			t.Error(
 				"Expected file", test.path,
+				"in case", i,
 				"parsed frontmatter data to be", test.frontmatterValues,
 				"instead got", file.Data,
 			)
@@ -189,6 +213,7 @@ func TestRead(t *testing.T) {
 		if !reflect.DeepEqual(sitePaths, testPaths) {
 			t.Error(
 				"Expected read to find", testPaths,
+				"in case", i,
 				"Instead got", sitePaths,
 			)
 		}
@@ -240,7 +265,7 @@ func containsSamePlugins(a []Plugin, b []Plugin) bool {
 }
 
 func TestUse(t *testing.T) {
-	for _, test := range useTests {
+	for i, test := range useTests {
 		site := GoSnap{}
 
 		if test.initial != nil {
@@ -259,6 +284,7 @@ func TestUse(t *testing.T) {
 				"Adding", test.toAdd,
 				"expected", test.endState,
 				"got", site.Plugins,
+				"in case", i,
 			)
 		}
 	}
