@@ -10,7 +10,7 @@ An example exists in the creatively named `/example` folder which can be run and
 
 ## Go
 
-Go seems to have good potential for this kind of build system (although I suspect it has less library support) since it has a strong concurrency model and a focus on speed. It also doesn't lose too many of javascripts strengths since it treats functions as first class citizens and isn't too verbose. 
+Go seems to have good potential for this kind of build system (although I suspect it has less library support) since it has a strong concurrency model and a focus on speed. It also doesn't lose too many of javascript's strengths since it treats functions as first class citizens and isn't too verbose. 
 
 ## To do
 

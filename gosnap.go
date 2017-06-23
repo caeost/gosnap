@@ -71,14 +71,14 @@ func (gs *GoSnap) Read() {
 	// make sure we have an acceptable set of things to ignore before we start
 	gs.transformIgnoreArrayToMap()
 
-	FileMap := gs.FileMap
-
 	readVisitor := func(filePath string, fileInfo os.FileInfo, err error) error {
 		if _, ignored := gs.IgnoreMap[filePath]; !ignored && !fileInfo.IsDir() {
 			internalPath := gs.transformToLocalPath(filePath)
 
 			fmt.Println("Reading file at", internalPath)
-			FileMap[internalPath] = gs.ReadFile(filePath, fileInfo)
+			gs.FileMap[internalPath] = gs.ReadFile(filePath)
+
+			gs.FileMap[internalPath].FileInfo = fileInfo
 		}
 
 		return err
@@ -88,7 +88,6 @@ func (gs *GoSnap) Read() {
 }
 
 func parseFrontmatter(data []byte) ([]byte, map[interface{}]interface{}) {
-	fmt.Println("parsing frontmatter", string(data))
 	if bytes.HasPrefix(data, []byte("---\n")) {
 		splits := bytes.SplitN(data, []byte("\n---\n"), 2)
 
@@ -104,13 +103,14 @@ func parseFrontmatter(data []byte) ([]byte, map[interface{}]interface{}) {
 		}
 		return splits[1], frontmatterValues
 	} else {
-		fmt.Println("no parsing done")
 		return data, nil
 	}
 }
 
-func (gs *GoSnap) ReadFile(path string, fileInfo os.FileInfo) *GoSnapFile {
-	data, err := ioutil.ReadFile(path)
+var ioUtilReadFile = ioutil.ReadFile
+
+func (gs *GoSnap) ReadFile(path string) *GoSnapFile {
+	data, err := ioUtilReadFile(path)
 
 	if err != nil {
 		panic(err)
@@ -118,7 +118,7 @@ func (gs *GoSnap) ReadFile(path string, fileInfo os.FileInfo) *GoSnapFile {
 
 	content, frontmatterValues := parseFrontmatter(data)
 
-	return &GoSnapFile{Content: content, Data: frontmatterValues, FileInfo: fileInfo}
+	return &GoSnapFile{Content: content, Data: frontmatterValues}
 }
 
 func (gs *GoSnap) Write() {
@@ -126,6 +126,8 @@ func (gs *GoSnap) Write() {
 		gs.WriteFile(filePath, *file)
 	}
 }
+
+var ioUtilWriteFile = ioutil.WriteFile
 
 func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) {
 	// default permissions for generated files
@@ -143,7 +145,7 @@ func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) {
 
 	os.MkdirAll(path.Dir(finalPath), os.ModePerm)
 
-	ioutil.WriteFile(finalPath, file.Content, perm)
+	ioUtilWriteFile(finalPath, file.Content, perm)
 }
 
 func (gs *GoSnap) Use(plugin Plugin) {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/caeost/gosnap"
 	"path"
 	"path/filepath"
@@ -17,7 +16,7 @@ func noHi(fileMap gosnap.FileMapType) {
 }
 
 func whatKey(fileMap gosnap.FileMapType) {
-	for fp, file := range fileMap {
+	for _, file := range fileMap {
 		if file.Data["key"] != nil {
 			file.Content = []byte("key: " + file.Data["key"].(string))
 		}
@@ -30,7 +29,6 @@ func main() {
 	site := gosnap.GoSnap{
 		Source:      path.Join(directory, "source"),
 		Destination: path.Join(directory, "destination"),
-		Clean:       false,
 		Plugins:     []gosnap.Plugin{noHi, whatKey},
 	}
 
