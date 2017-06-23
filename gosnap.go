@@ -69,9 +69,14 @@ func (gs *GoSnap) transformToLocalPath(filePath string) string {
 	return internalPath
 }
 
+var filepathWalk = filepath.Walk
+
 func (gs *GoSnap) Read() {
 	// make sure we have an acceptable set of things to ignore before we start
 	gs.transformIgnoreArrayToMap()
+
+	// start over fresh for each build
+	gs.FileMap = make(FileMapType)
 
 	readVisitor := func(filePath string, fileInfo os.FileInfo, err error) error {
 		if _, ignored := gs.IgnoreMap[filePath]; !ignored && !fileInfo.IsDir() {
@@ -86,7 +91,7 @@ func (gs *GoSnap) Read() {
 		return err
 	}
 
-	filepath.Walk(gs.Source, readVisitor)
+	filepathWalk(gs.Source, readVisitor)
 }
 
 func parseFrontmatter(data []byte) ([]byte, FrontmatterValueType) {
@@ -155,8 +160,6 @@ func (gs *GoSnap) Use(plugin Plugin) {
 }
 
 func (gs *GoSnap) Build() {
-	// start over fresh for each build
-	gs.FileMap = make(FileMapType)
 	// read all files into map
 	gs.Read()
 	// run files through plugins
