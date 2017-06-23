@@ -1,6 +1,6 @@
 # Go Snap
 
-This is a very basic pluggable site generator I wrote in go to learn a little bit about the language. It's based very heavily off of the functionality of [metalsmith](metalsmith.io) since I think it hit a nice minimal level of necessary functionality.
+This is a very basic pluggable site generator I wrote in go to learn a little bit about the language. It's based very heavily off of the functionality of [metalsmith](http://metalsmith.io) since I think it hit a nice minimal level of necessary functionality.
 
 I simplified the structure a bit based off of what I found using metalsmith on a previous project: `metadata` is gone since I think it's not that useful, also the asynchronicity helping hand of metalsmith is gone since go and javascript are different languages...
 
