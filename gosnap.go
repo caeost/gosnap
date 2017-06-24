@@ -165,7 +165,7 @@ func (gs *GoSnap) Build() {
 	// read all files into map
 	gs.Read()
 	// run files through plugins
-	run(gs.FileMap, gs.Plugins)
+	Run(gs.FileMap, gs.Plugins)
 
 	// clean out the output directory if necessary
 	if gs.Clean {
@@ -186,7 +186,7 @@ func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
-func run(fileMap FileMapType, plugins []Plugin) {
+func Run(fileMap FileMapType, plugins []Plugin) {
 	for _, plugin := range plugins {
 		fmt.Println("Running plugin", getFunctionName(plugin))
 		plugin(fileMap)

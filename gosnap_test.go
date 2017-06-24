@@ -453,10 +453,125 @@ func TestUse(t *testing.T) {
 	}
 }
 
-func TestBuild(t *testing.T) {
+type runStruct struct {
+	fileMap  FileMapType
+	plugins  []Plugin
+	expected FileMapType
+}
 
+var runTests = []runStruct{
+	{nil, nil, nil},
+	{
+		FileMapType{
+			"file.file":                         &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
+			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
+		},
+		nil,
+		FileMapType{
+			"file.file":                         &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
+			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
+		},
+	},
+	{
+		FileMapType{
+			"file.file":                         &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
+			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
+		},
+		[]Plugin{a},
+		FileMapType{
+			"file.file":                         &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
+			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
+		},
+	},
 }
 
 func TestRun(t *testing.T) {
+	for i, test := range runTests {
+		Run(test.fileMap, test.plugins)
 
+		if !reflect.DeepEqual(test.fileMap, test.expected) {
+			t.Error(
+				"Expected", test.expected,
+				"Instead got", test.fileMap,
+				"using plugins", test.plugins,
+				"in case", i,
+			)
+		}
+	}
+}
+
+type buildStruct struct {
+	directoryState []string
+	plugins        []Plugin
+	expected       FileMapType
+}
+
+var buildTests = []buildStruct{
+	{nil, nil, FileMapType{}},
+	{[]string{}, nil, FileMapType{}},
+	{[]string{"file.file", "a/d/e/e/p/l/y/n/e/s/t/e/d/file.go"}, nil, FileMapType{
+		"file.file":                         &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
+		"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
+	}},
+}
+
+func testEqualFileMap(a FileMapType, b FileMapType) bool {
+	if len(a) != len(b) {
+		return false
+	} else {
+		for name, fp := range a {
+			if b[name] == nil || !reflect.DeepEqual(fp.Content, b[name].Content) {
+				return false
+			}
+		}
+
+		return true
+	}
+}
+
+func TestBuild(t *testing.T) {
+	oldIoUtilReadFile := ioUtilReadFile
+	oldFilepathWalk := filepathWalk
+	oldIoUtilWriteFile := ioUtilWriteFile
+	oldMkdirAll := mkdirAll
+
+	defer func() { ioUtilWriteFile = oldIoUtilWriteFile }()
+	defer func() { mkdirAll = oldMkdirAll }()
+	defer func() { ioUtilReadFile = oldIoUtilReadFile }()
+	defer func() { filepathWalk = oldFilepathWalk }()
+
+	index := 0
+	ioUtilReadFile = func(path string) ([]byte, error) {
+		return []byte("hi\n" + path + "\nbye\n"), nil
+	}
+	filepathWalk = func(dir string, visitor filepath.WalkFunc) error {
+		for _, path := range buildTests[index].directoryState {
+			_ = visitor(path, MockFileInfo{}, nil)
+		}
+
+		return nil
+	}
+	ioUtilWriteFile = func(path string, content []byte, perm os.FileMode) error {
+		return nil
+	}
+	mkdirAll = func(path string, perm os.FileMode) error {
+		return nil
+	}
+
+	for i, test := range buildTests {
+		index = i
+
+		site := GoSnap{Plugins: test.plugins}
+
+		site.Build()
+
+		if !testEqualFileMap(site.FileMap, test.expected) {
+			t.Error(
+				"Expected", test.expected,
+				"Instead got", site.FileMap,
+				"using plugins", test.plugins,
+				"in case", i,
+			)
+		}
+	}
 }
