@@ -6,11 +6,31 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 )
 
-// TODO replace with actual mock
 // shortcut to get a valid FileInfo value
-var testFileInfo, _ = os.Lstat("./gosnap_test.go")
+type MockFileInfo struct {
+}
+
+func (mfi MockFileInfo) Name() string {
+	return "name"
+}
+func (mfi MockFileInfo) Size() int64 {
+	return int64(0)
+}
+func (mfi MockFileInfo) Mode() os.FileMode {
+	return 0777
+}
+func (mfi MockFileInfo) ModTime() time.Time {
+	return time.Now()
+}
+func (mfi MockFileInfo) IsDir() bool {
+	return false
+}
+func (mfi MockFileInfo) Sys() interface{} {
+	return nil
+}
 
 type transformToLocalPathStruct struct {
 	input  string
@@ -188,7 +208,7 @@ func TestRead(t *testing.T) {
 	}
 	filepathWalk = func(dir string, visitor filepath.WalkFunc) error {
 		for _, path := range readTests[index].directoryState {
-			_ = visitor(path, testFileInfo, nil)
+			_ = visitor(path, MockFileInfo{}, nil)
 		}
 
 		return nil
@@ -234,12 +254,12 @@ var writeFileTests = []writeFileStruct{
 	{
 		"a/b.go",
 		"/aa",
-		GoSnapFile{Content: []byte("howdy"), FileInfo: testFileInfo},
-		writeResultStruct{path: "/aa/a/b.go", content: []byte("howdy"), perm: os.ModePerm},
+		GoSnapFile{Content: []byte("howdy"), FileInfo: MockFileInfo{}},
+		writeResultStruct{path: "/aa/a/b.go", content: []byte("howdy"), perm: 0777},
 	},
 }
 
-func TodoTestWriteFile(t *testing.T) {
+func TestWriteFile(t *testing.T) {
 	oldIoUtilWriteFile := ioUtilWriteFile
 	oldMkdirAll := mkdirAll
 
@@ -308,32 +328,48 @@ var writeTests = []writeStruct{
 	},
 }
 
-// func TodoTestWrite(t *testing.T) {
-// 	for i, test := range writeTests {
-// 		site := GoSnap{}
+func TestWrite(t *testing.T) {
+	oldIoUtilWriteFile := ioUtilWriteFile
+	oldMkdirAll := mkdirAll
 
-// 		count := 0
-// 		results := make([]string, len(test.fileMap))
+	defer func() { ioUtilWriteFile = oldIoUtilWriteFile }()
+	defer func() { mkdirAll = oldMkdirAll }()
 
-// 		WriteFile = func(filePath string, file GoSnapFile) {
-// 			results[count] = filePath
-// 			count++
-// 		}
+	index := 0
+	results := make([][]string, len(writeFileTests))
 
-// 		site.Write()
+	ioUtilWriteFile = func(path string, content []byte, perm os.FileMode) error {
+		if results[index] != nil {
+			results[index] = append(results[index], path)
+		} else {
+			results[index] = []string{path}
+		}
+		return nil
+	}
+	mkdirAll = func(path string, perm os.FileMode) error {
+		return nil
+	}
 
-// 		sort.Strings(test.expected)
-// 		sort.Strings(results)
+	for i, test := range writeTests {
+		index = i
 
-// 		if !reflect.DeepEqual(test.expected, results) {
-// 			t.Error(
-// 				"Expected to write out", test.expected,
-// 				"In case", i,
-// 				"Instead got", results,
-// 			)
-// 		}
-// 	}
-// }
+		site := GoSnap{FileMap: test.fileMap}
+
+		site.Write()
+
+		sort.Strings(test.expected)
+
+		sort.Strings(results[i])
+
+		if !reflect.DeepEqual(test.expected, results[i]) {
+			t.Error(
+				"Expected to write out", test.expected,
+				"In case", i,
+				"Instead got", results[i],
+			)
+		}
+	}
+}
 
 type useStruct struct {
 	initial  []Plugin
