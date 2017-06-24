@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/caeost/gosnap.svg?branch=master)](https://travis-ci.org/caeost/gosnap)
+
 # Go Snap
 
 This is a very basic pluggable site generator I wrote in go to learn a little bit about the language. It's based very heavily off of the functionality of [metalsmith](http://metalsmith.io) since I think it hit a nice minimal level of necessary functionality.
