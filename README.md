@@ -18,3 +18,4 @@ Go seems to have good potential for this kind of build system (although I suspec
 
 * Actually useful plugins
 * Benchmarking
+* Switch to using a logging framework
