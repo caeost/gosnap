@@ -257,6 +257,18 @@ var writeFileTests = []writeFileStruct{
 		GoSnapFile{Content: []byte("howdy"), FileInfo: MockFileInfo{}},
 		writeResultStruct{path: "/aa/a/b.go", content: []byte("howdy"), perm: 0777},
 	},
+	{
+		"b.go",
+		"",
+		GoSnapFile{Content: []byte("howdy"), FileInfo: MockFileInfo{}},
+		writeResultStruct{path: "b.go", content: []byte("howdy"), perm: 0777},
+	},
+	{
+		"c/c/c/c/b.go",
+		"/c/c/c/",
+		GoSnapFile{Content: []byte("howdy")},
+		writeResultStruct{path: "/c/c/c/c/c/c/c/b.go", content: []byte("howdy"), perm: 0644},
+	},
 }
 
 func TestWriteFile(t *testing.T) {
@@ -324,6 +336,14 @@ var writeTests = []writeStruct{
 		[]string{
 			"file.file",
 			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go",
+		},
+	},
+	{
+		FileMapType{
+			"file.file": &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
+		},
+		[]string{
+			"file.file",
 		},
 	},
 }
