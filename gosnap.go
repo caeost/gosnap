@@ -2,7 +2,7 @@ package gosnap
 
 import (
 	"bytes"
-	"fmt"
+	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -13,8 +13,16 @@ import (
 	"strings"
 )
 
+// default permissions for generated files
+// user: read & write
+// group: read
+// other: read
+const (
+	DEFAULT_PERM = os.FileMode(0644)
+)
+
 // All the types its fit to print
-type Plugin func(FileMapType)
+type Plugin func(FileMapType) error
 
 type FrontmatterValueType map[interface{}]interface{}
 
@@ -43,23 +51,22 @@ type GoSnap struct {
 	Source      string
 	Destination string
 	Clean       bool
-	Ignore      []string
 	IgnoreMap   StringSet
 	FileMap     FileMapType
 	Plugins     []Plugin
 }
 
-// utility functions for reading
-func (gs *GoSnap) transformIgnoreArrayToMap() {
-	if gs.Ignore != nil {
-		gs.IgnoreMap = make(StringSet)
-
-		for _, entry := range gs.Ignore {
-			gs.IgnoreMap[entry] = struct{}{}
-		}
-	}
+// Optional configurations
+type GoSnapConfig struct {
+	Clean     bool
+	Ignore    []string
+	IgnoreMap StringSet
+	FileMap   FileMapType
+	Plugins   []Plugin
 }
-func transformToLocalPath(filePath string, source string) string {
+
+// utility functions for reading
+func TransformToLocalPath(filePath string, source string) string {
 	filePath = path.Clean(filePath)
 	internalPath := strings.Replace(filePath, source, "", 1)
 
@@ -70,115 +77,170 @@ func transformToLocalPath(filePath string, source string) string {
 	return internalPath
 }
 
-var filepathWalk = filepath.Walk
-
-func (gs *GoSnap) Read() {
-	// make sure we have an acceptable set of things to ignore before we start
-	gs.transformIgnoreArrayToMap()
-
-	// start over fresh for each build
-	gs.FileMap = make(FileMapType)
-
-	readVisitor := func(filePath string, fileInfo os.FileInfo, err error) error {
-		if _, ignored := gs.IgnoreMap[filePath]; !ignored && fileInfo != nil && !fileInfo.IsDir() {
-			internalPath := transformToLocalPath(filePath, gs.Source)
-
-			fmt.Println("Reading file at", internalPath)
-			gs.FileMap[internalPath] = gs.ReadFile(filePath)
-
-			gs.FileMap[internalPath].FileInfo = fileInfo
-		}
-
-		return err
-	}
-
-	filepathWalk(gs.Source, readVisitor)
-}
-
-func parseFrontmatter(data []byte) ([]byte, FrontmatterValueType) {
+func parseFrontmatter(data []byte) ([]byte, FrontmatterValueType, error) {
 	if bytes.HasPrefix(data, []byte("---\n")) {
 		splits := bytes.SplitN(data, []byte("\n---\n"), 2)
 
 		if len(splits) != 2 {
-			panic("Incorrect frontmatter format")
+			return nil, nil, errors.New("Incorrect format for file. If file includes frontmatter it must start with it and surround it with lines containing only ---")
 		}
 
 		frontmatterValues := make(FrontmatterValueType)
-		err := yaml.Unmarshal(splits[0], frontmatterValues)
 
-		if err != nil {
-			panic(err)
+		if err := yaml.Unmarshal(splits[0], frontmatterValues); err != nil {
+			return nil, nil, errors.Wrap(err, "Could not parse front matter YAML")
 		}
-		return splits[1], frontmatterValues
+
+		return splits[1], frontmatterValues, nil
 	} else {
-		return data, nil
+		return data, nil, nil
 	}
 }
 
 var ioUtilReadFile = ioutil.ReadFile
 
-func (gs *GoSnap) ReadFile(path string) *GoSnapFile {
+func (gs *GoSnap) ReadFile(path string) (*GoSnapFile, error) {
 	data, err := ioUtilReadFile(path)
 
 	if err != nil {
-		panic(err)
+		return &GoSnapFile{}, errors.Wrap(err, "Could not read file from filesystem")
 	}
 
-	content, frontmatterValues := parseFrontmatter(data)
+	content, frontmatterValues, yamlErr := parseFrontmatter(data)
 
-	return &GoSnapFile{Content: content, Data: frontmatterValues}
+	if yamlErr != nil {
+		return &GoSnapFile{}, errors.Wrapf(yamlErr, "Error parsing YAML in %v", path)
+	}
+
+	return &GoSnapFile{Content: content, Data: frontmatterValues}, nil
 }
 
-func (gs *GoSnap) Write() {
-	for filePath, file := range gs.FileMap {
-		gs.WriteFile(filePath, *file)
+var filepathWalk = filepath.Walk
+
+func (gs *GoSnap) Ignore(ignore string) {
+	if gs.IgnoreMap == nil {
+		gs.IgnoreMap = make(StringSet)
 	}
+
+	gs.IgnoreMap[ignore] = struct{}{}
+}
+
+func (gs *GoSnap) IgnoreAll(ignore ...string) {
+	for _, ignored := range ignore {
+		gs.Ignore(ignored)
+	}
+}
+
+func (gs *GoSnap) Read() error {
+	if gs.Source == "" {
+		return errors.New("No Source set in GoSnap object")
+	}
+
+	// start over fresh for each build
+	gs.FileMap = make(FileMapType)
+
+	readVisitor := func(filePath string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return errors.Wrapf(err, "Filesystem walk error found at %v", filePath)
+		}
+
+		if _, ignored := gs.IgnoreMap[filePath]; !ignored && fileInfo != nil && !fileInfo.IsDir() {
+			internalPath := TransformToLocalPath(filePath, gs.Source)
+
+			file, err := gs.ReadFile(filePath)
+
+			if err != nil {
+				return errors.Wrapf(err, "Could not read file %v", filePath)
+			}
+
+			file.FileInfo = fileInfo
+			gs.FileMap[internalPath] = file
+		}
+
+		return nil
+	}
+
+	return filepathWalk(gs.Source, readVisitor)
 }
 
 var mkdirAll = os.MkdirAll
 var ioUtilWriteFile = ioutil.WriteFile
 
-func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) {
-	// default permissions for generated files
-	// user: read & write
-	// group: read
-	// other: read
-	perm := os.FileMode(0644)
+func (gs *GoSnap) WriteFile(filePath string, file GoSnapFile) error {
+	if gs.Destination == "" {
+		return errors.New("No Destination set in GoSnap object")
+	}
 
+	perm := DEFAULT_PERM
 	if file.FileInfo != nil {
 		perm = file.FileInfo.Mode()
 	}
 
 	finalPath := path.Join(gs.Destination, filePath)
-	fmt.Println("Writing file out at", finalPath)
 
-	mkdirAll(path.Dir(finalPath), os.ModePerm)
+	mkdirErr := mkdirAll(path.Dir(finalPath), os.ModePerm)
 
-	ioUtilWriteFile(finalPath, file.Content, perm)
+	if mkdirErr != nil {
+		return errors.Wrapf(mkdirErr, "Could not create required directories for %v", finalPath)
+	}
+
+	return ioUtilWriteFile(finalPath, file.Content, perm)
 }
 
-func (gs *GoSnap) Use(plugin Plugin) {
-	gs.Plugins = append(gs.Plugins, plugin)
+func cleanOutput(destination string) error {
+	fileInfo, err := os.Stat(destination)
+	if err != nil {
+		return err
+	}
+
+	err = os.RemoveAll(destination)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(destination, fileInfo.Mode())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (gs *GoSnap) Build() {
-	// read all files into map
-	gs.Read()
-	// run files through plugins
-	Run(gs.FileMap, gs.Plugins)
+func (gs *GoSnap) Write() error {
+	if gs.Destination == "" {
+		return errors.New("No Destination set in GoSnap object")
+	}
 
 	// clean out the output directory if necessary
 	if gs.Clean {
-		fileInfo, err := os.Stat(gs.Destination)
-		if err != nil {
-			panic(err)
+		if err := cleanOutput(gs.Destination); err != nil {
+			return errors.Wrapf(err, "Could not clean output directory %v before write", gs.Destination)
 		}
-		os.RemoveAll(gs.Destination)
-		os.MkdirAll(gs.Destination, fileInfo.Mode())
 	}
 
-	// write out new files
-	gs.Write()
+	for filePath, file := range gs.FileMap {
+		err := gs.WriteFile(filePath, *file)
+
+		if err != nil {
+			return errors.Wrapf(err, "Exiting because of failure to write file %v", filePath)
+		}
+	}
+
+	return nil
+}
+
+func (gs *GoSnap) Use(plugin Plugin) {
+	if gs.Plugins == nil {
+		gs.Plugins = []Plugin{}
+	}
+
+	gs.Plugins = append(gs.Plugins, plugin)
+}
+
+func (gs *GoSnap) UseAll(plugins ...Plugin) {
+	for _, plugin := range plugins {
+		gs.Use(plugin)
+	}
 }
 
 // from https://stackoverflow.com/questions/7052693/how-to-get-the-name-of-a-function-in-go
@@ -186,9 +248,39 @@ func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
-func Run(fileMap FileMapType, plugins []Plugin) {
+func Run(fileMap FileMapType, plugins []Plugin) error {
 	for _, plugin := range plugins {
-		fmt.Println("Running plugin", getFunctionName(plugin))
-		plugin(fileMap)
+		pluginName := getFunctionName(plugin)
+
+		if err := plugin(fileMap); err != nil {
+			return errors.Wrapf(err, "Exiting because of problem in plugin %v", pluginName)
+		}
 	}
+
+	return nil
+}
+
+func (gs *GoSnap) Build() (err error) {
+	// read all files into map
+	err = gs.Read()
+
+	if err != nil {
+		return errors.Wrap(err, "Build failed at read step")
+	}
+
+	// run files through plugins
+	err = Run(gs.FileMap, gs.Plugins)
+
+	if err != nil {
+		return errors.Wrap(err, "Build failed during plugin run")
+	}
+
+	// write out new files
+	err = gs.Write()
+
+	if err != nil {
+		return errors.Wrap(err, "Build failed writing files")
+	}
+
+	return nil
 }

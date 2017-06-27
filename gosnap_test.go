@@ -47,7 +47,7 @@ var transformToLocalPathTests = []transformToLocalPathStruct{
 
 func TestTransformToLocalPath(t *testing.T) {
 	for i, test := range transformToLocalPathTests {
-		output := transformToLocalPath(test.input, test.source)
+		output := TransformToLocalPath(test.input, test.source)
 
 		if output != test.output {
 			t.Error(
@@ -64,16 +64,17 @@ type readFileStruct struct {
 	content           []byte
 	expectedContent   []byte
 	frontmatterValues FrontmatterValueType
+	expectedError     error
 }
 
 var readFileTests = []readFileStruct{
-	{"an/empty/file.html", []byte(""), []byte(""), nil},
-	{"a/file.html", []byte("hi\na/file.html\nbye\n"), []byte("hi\na/file.html\nbye\n"), nil},
-	{"bile.html", []byte("---\nkey: value\n---\nblahblah"), []byte("blahblah"), FrontmatterValueType{"key": "value"}},
-	{"bile-arrays.html", []byte("---\nkey: [value]\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{"value"}}},
-	{"bile-arrays-other-format.html", []byte("---\nkey:\n - value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{"value"}}},
-	{"bile-maps.html", []byte("---\nkey:\n inner: value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": FrontmatterValueType{"inner": "value"}}},
-	{"bile-array-maps.html", []byte("---\nkey:\n - inner: value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{FrontmatterValueType{"inner": "value"}}}},
+	{"an/empty/file.html", []byte(""), []byte(""), nil, nil},
+	{"a/file.html", []byte("hi\na/file.html\nbye\n"), []byte("hi\na/file.html\nbye\n"), nil, nil},
+	{"bile.html", []byte("---\nkey: value\n---\nblahblah"), []byte("blahblah"), FrontmatterValueType{"key": "value"}, nil},
+	{"bile-arrays.html", []byte("---\nkey: [value]\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{"value"}}, nil},
+	{"bile-arrays-other-format.html", []byte("---\nkey:\n - value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{"value"}}, nil},
+	{"bile-maps.html", []byte("---\nkey:\n inner: value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": FrontmatterValueType{"inner": "value"}}, nil},
+	{"bile-array-maps.html", []byte("---\nkey:\n - inner: value\n---\nblah\nblah"), []byte("blah\nblah"), FrontmatterValueType{"key": []interface{}{FrontmatterValueType{"inner": "value"}}}, nil},
 }
 
 func TestReadFile(t *testing.T) {
@@ -90,22 +91,35 @@ func TestReadFile(t *testing.T) {
 		index = i
 		site := GoSnap{}
 
-		file := site.ReadFile(test.path)
+		file, err := site.ReadFile(test.path)
 
-		if !reflect.DeepEqual(file.Content, test.expectedContent) {
-			t.Error(
-				"Expected file", test.path,
-				"to contain:\n", string(test.content),
-				"instead got:\n", string(file.Content),
-			)
-		}
-		if !reflect.DeepEqual(file.Data, test.frontmatterValues) {
-			t.Error(
-				"Expected file", test.path,
-				"in case", i,
-				"parsed frontmatter data to be", test.frontmatterValues,
-				"instead got", file.Data,
-			)
+		if err != nil {
+			if test.expectedError == nil {
+				t.Error("ReadFile errored unexpectedly: %v", err)
+			} else {
+				if err != test.expectedError {
+					t.Error(
+						"Expected error", test.expectedError,
+						"instead got", err,
+					)
+				}
+			}
+		} else {
+			if !reflect.DeepEqual(file.Content, test.expectedContent) {
+				t.Error(
+					"Expected file", test.path,
+					"to contain:\n", string(test.content),
+					"instead got:\n", string(file.Content),
+				)
+			}
+			if !reflect.DeepEqual(file.Data, test.frontmatterValues) {
+				t.Error(
+					"Expected file", test.path,
+					"in case", i,
+					"parsed frontmatter data to be", test.frontmatterValues,
+					"instead got", file.Data,
+				)
+			}
 		}
 	}
 }
@@ -113,15 +127,16 @@ func TestReadFile(t *testing.T) {
 type readStruct struct {
 	directoryState []string
 	fileMap        FileMapType
+	expectedError  error
 }
 
 var readTests = []readStruct{
-	{nil, nil},
-	{[]string{"file.file"}, FileMapType{"file.file": &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")}}},
+	{nil, nil, nil},
+	{[]string{"file.file"}, FileMapType{"file.file": &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")}}, nil},
 	{[]string{"file.file", "a/d/e/e/p/l/y/n/e/s/t/e/d/file.go"}, FileMapType{
 		"file.file":                         &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
 		"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
-	}},
+	}, nil},
 	{[]string{
 		"file.file",
 		"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go",
@@ -180,7 +195,7 @@ var readTests = []readStruct{
 		"a/d/e/e/p/l/y/n/e/s/t/e/d/file24.go": &GoSnapFile{Content: []byte("hi\n/a/d/e/e/p/l/y/n/e/s/t/e/d/file24.go\nbye\n")},
 		"a/d/e/e/l/y/n/e/s/t/e/d/file25.go":   &GoSnapFile{Content: []byte("hi\n/a/d/e/e/l/y/n/e/s/t/e/d/file25.go\nbye\n")},
 		"a/d/e/p/l/y/n/e/s/t/e/d/file26.go":   &GoSnapFile{Content: []byte("hi\n/a/d/e/p/l/y/n/e/s/t/e/d/file26.go\nbye\n")},
-	}},
+	}, nil},
 }
 
 func mapKeys(mymap FileMapType) []string {
@@ -217,9 +232,24 @@ func TestRead(t *testing.T) {
 	for i, test := range readTests {
 		index = i
 
-		site := GoSnap{}
+		site := GoSnap{
+			Source: "dir",
+		}
 
-		site.Read()
+		err := site.Read()
+
+		if err != nil {
+			if test.expectedError == nil {
+				t.Error("Read errored unexpectedly: %v", err)
+			} else {
+				if err != test.expectedError {
+					t.Error(
+						"Expected error", test.expectedError,
+						"instead got", err,
+					)
+				}
+			}
+		}
 
 		sitePaths := mapKeys(site.FileMap)
 		sort.Strings(sitePaths)
@@ -259,9 +289,9 @@ var writeFileTests = []writeFileStruct{
 	},
 	{
 		"b.go",
-		"",
+		"/",
 		GoSnapFile{Content: []byte("howdy"), FileInfo: MockFileInfo{}},
-		writeResultStruct{path: "b.go", content: []byte("howdy"), perm: 0777},
+		writeResultStruct{path: "/b.go", content: []byte("howdy"), perm: 0777},
 	},
 	{
 		"c/c/c/c/b.go",
@@ -323,8 +353,9 @@ func TestWriteFile(t *testing.T) {
 }
 
 type writeStruct struct {
-	fileMap  FileMapType
-	expected []string
+	fileMap       FileMapType
+	expected      []string
+	expectedError error
 }
 
 var writeTests = []writeStruct{
@@ -334,17 +365,19 @@ var writeTests = []writeStruct{
 			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
 		},
 		[]string{
-			"file.file",
-			"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go",
+			"/out/file.file",
+			"/out/a/d/e/e/p/l/y/n/e/s/t/e/d/file.go",
 		},
+		nil,
 	},
 	{
 		FileMapType{
 			"file.file": &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
 		},
 		[]string{
-			"file.file",
+			"/out/file.file",
 		},
+		nil,
 	},
 }
 
@@ -373,9 +406,25 @@ func TestWrite(t *testing.T) {
 	for i, test := range writeTests {
 		index = i
 
-		site := GoSnap{FileMap: test.fileMap}
+		site := GoSnap{
+			FileMap:     test.fileMap,
+			Destination: "/out",
+		}
 
-		site.Write()
+		err := site.Write()
+
+		if err != nil {
+			if test.expectedError == nil {
+				t.Error("Write errored unexpectedly: %v", err)
+			} else {
+				if err != test.expectedError {
+					t.Error(
+						"Expected error", test.expectedError,
+						"instead got", err,
+					)
+				}
+			}
+		}
 
 		sort.Strings(test.expected)
 
@@ -397,12 +446,12 @@ type useStruct struct {
 	endState []Plugin
 }
 
-func a(fm FileMapType) {
-
+func a(fm FileMapType) error {
+	return nil
 }
 
-func b(fm FileMapType) {
-
+func b(fm FileMapType) error {
+	return nil
 }
 
 var useTests = []useStruct{
@@ -451,6 +500,10 @@ func TestUse(t *testing.T) {
 			)
 		}
 	}
+}
+
+func TestUseAll(t *testing.T) {
+
 }
 
 type runStruct struct {
@@ -504,15 +557,16 @@ type buildStruct struct {
 	directoryState []string
 	plugins        []Plugin
 	expected       FileMapType
+	expectedError  error
 }
 
 var buildTests = []buildStruct{
-	{nil, nil, FileMapType{}},
-	{[]string{}, nil, FileMapType{}},
+	{nil, nil, FileMapType{}, nil},
+	{[]string{}, nil, FileMapType{}, nil},
 	{[]string{"file.file", "a/d/e/e/p/l/y/n/e/s/t/e/d/file.go"}, nil, FileMapType{
 		"file.file":                         &GoSnapFile{Content: []byte("hi\nfile.file\nbye\n")},
 		"a/d/e/e/p/l/y/n/e/s/t/e/d/file.go": &GoSnapFile{Content: []byte("hi\na/d/e/e/p/l/y/n/e/s/t/e/d/file.go\nbye\n")},
-	}},
+	}, nil},
 }
 
 func testEqualFileMap(a FileMapType, b FileMapType) bool {
@@ -531,19 +585,14 @@ func testEqualFileMap(a FileMapType, b FileMapType) bool {
 
 func TestBuild(t *testing.T) {
 	oldIoUtilReadFile := ioUtilReadFile
-	oldFilepathWalk := filepathWalk
-	oldIoUtilWriteFile := ioUtilWriteFile
-	oldMkdirAll := mkdirAll
-
-	defer func() { ioUtilWriteFile = oldIoUtilWriteFile }()
-	defer func() { mkdirAll = oldMkdirAll }()
 	defer func() { ioUtilReadFile = oldIoUtilReadFile }()
-	defer func() { filepathWalk = oldFilepathWalk }()
-
-	index := 0
 	ioUtilReadFile = func(path string) ([]byte, error) {
 		return []byte("hi\n" + path + "\nbye\n"), nil
 	}
+
+	oldFilepathWalk := filepathWalk
+	defer func() { filepathWalk = oldFilepathWalk }()
+	index := 0
 	filepathWalk = func(dir string, visitor filepath.WalkFunc) error {
 		for _, path := range buildTests[index].directoryState {
 			_ = visitor(path, MockFileInfo{}, nil)
@@ -551,9 +600,15 @@ func TestBuild(t *testing.T) {
 
 		return nil
 	}
+
+	oldIoUtilWriteFile := ioUtilWriteFile
+	defer func() { ioUtilWriteFile = oldIoUtilWriteFile }()
 	ioUtilWriteFile = func(path string, content []byte, perm os.FileMode) error {
 		return nil
 	}
+
+	oldMkdirAll := mkdirAll
+	defer func() { mkdirAll = oldMkdirAll }()
 	mkdirAll = func(path string, perm os.FileMode) error {
 		return nil
 	}
@@ -561,9 +616,26 @@ func TestBuild(t *testing.T) {
 	for i, test := range buildTests {
 		index = i
 
-		site := GoSnap{Plugins: test.plugins}
+		site := GoSnap{
+			Source:      "/dir",
+			Destination: "/out",
+			Plugins:     test.plugins,
+		}
 
-		site.Build()
+		err := site.Build()
+
+		if err != nil {
+			if test.expectedError == nil {
+				t.Error("Write errored unexpectedly: %v", err)
+			} else {
+				if err != test.expectedError {
+					t.Error(
+						"Expected error", test.expectedError,
+						"instead got", err,
+					)
+				}
+			}
+		}
 
 		if !testEqualFileMap(site.FileMap, test.expected) {
 			t.Error(
@@ -574,4 +646,8 @@ func TestBuild(t *testing.T) {
 			)
 		}
 	}
+}
+
+func TestIgnore(t *testing.T) {
+
 }
