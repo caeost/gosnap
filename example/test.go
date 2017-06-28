@@ -32,11 +32,13 @@ func main() {
 	site := gosnap.GoSnap{
 		Source:      path.Join(directory, "source"),
 		Destination: path.Join(directory, "destination"),
+		Clean:       true,
 	}
 
 	site.Use(whatKey)
 	site.Use(plugins.Render)
 	site.Use(plugins.MinifyCSS)
+	site.Use(plugins.MinifyJS)
 
 	err := site.Build()
 

@@ -28,20 +28,28 @@ func setup() *minify.M {
 
 var minifier = setup()
 
-func MinifyCSS(fileMap gosnap.FileMapType) error {
-	for filePath, file := range fileMap {
-		if strings.HasSuffix(filePath, ".css") {
-			if val, exists := file.Data["minify"]; !exists || val == true {
-				minified, err := minifier.Bytes("text/css", file.Content)
+func minifyType(mimetype string, suffix string) gosnap.Plugin {
+	return func(fileMap gosnap.FileMapType) error {
+		for filePath, file := range fileMap {
+			if strings.HasSuffix(filePath, suffix) {
+				if val, exists := file.Data["minify"]; !exists || val == true {
+					minified, err := minifier.Bytes(mimetype, file.Content)
 
-				if err != nil {
-					return errors.Wrapf(err, "Could not minify file %v", filePath)
+					if err != nil {
+						return errors.Wrapf(err, "Could not minify file %v", filePath)
+					}
+
+					file.Content = minified
 				}
-
-				file.Content = minified
 			}
 		}
-	}
 
-	return nil
+		return nil
+	}
 }
+
+var MinifyCSS = minifyType("text/css", ".css")
+var MinifyHTML = minifyType("text/html", ".html")
+var MinifyJS = minifyType("text/javascript", ".js")
+var MinifyJSON = minifyType("text/.json", ".json")
+var MinifyXML = minifyType("text/.xml", ".xml")
