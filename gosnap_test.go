@@ -502,10 +502,6 @@ func TestUse(t *testing.T) {
 	}
 }
 
-func TestUseAll(t *testing.T) {
-
-}
-
 type runStruct struct {
 	fileMap  FileMapType
 	plugins  []Plugin

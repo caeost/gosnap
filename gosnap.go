@@ -32,6 +32,20 @@ type GoSnapFile struct {
 	Data     FrontmatterValueType
 }
 
+// Implement io.Writer interface so that plugins can write to the file as if it is a real file
+func (gsf *GoSnapFile) Write(p []byte) (n int, err error) {
+	gsf.Content = append(gsf.Content, p...)
+
+	return len(p), nil
+}
+
+// Implement io.Read interface so that plugins can read from the file as if it is a real file
+func (gsf *GoSnapFile) Read(p []byte) (n int, err error) {
+	copy(p, gsf.Content)
+
+	return len(p), nil
+}
+
 type FileMapType map[string]*GoSnapFile
 
 type StringSet map[string]struct{}

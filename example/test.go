@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/caeost/gosnap"
+	"github.com/caeost/gosnap/plugins"
 	"os"
 	"path"
 	"runtime"
@@ -46,11 +47,12 @@ func main() {
 
 	site.Use(noHi)
 	site.Use(whatKey)
+	site.Use(plugins.Render)
 
 	err := site.Build()
 
 	if err != nil {
-		fmt.Println("Error running build %v", err)
+		fmt.Printf("Error running build %v", err)
 		os.Exit(1)
 	}
 }
