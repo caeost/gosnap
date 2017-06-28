@@ -7,18 +7,7 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strings"
 )
-
-func noHi(fileMap gosnap.FileMapType) error {
-	for _, file := range fileMap {
-		result := strings.Replace(string(file.Content[:]), "hi", "noooo", -1)
-
-		file.Content = []byte(result)
-	}
-
-	return nil
-}
 
 func whatKey(fileMap gosnap.FileMapType) error {
 	for _, file := range fileMap {
@@ -45,14 +34,14 @@ func main() {
 		Destination: path.Join(directory, "destination"),
 	}
 
-	site.Use(noHi)
 	site.Use(whatKey)
 	site.Use(plugins.Render)
+	site.Use(plugins.MinifyCSS)
 
 	err := site.Build()
 
 	if err != nil {
-		fmt.Printf("Error running build %v", err)
+		fmt.Printf("Error running build. %v", err)
 		os.Exit(1)
 	}
 }
