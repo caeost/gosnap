@@ -32,9 +32,13 @@ func MinifyCSS(fileMap gosnap.FileMapType) error {
 	for filePath, file := range fileMap {
 		if strings.HasSuffix(filePath, ".css") {
 			if val, exists := file.Data["minify"]; !exists || val == true {
-				if err := minifier.Minify("text/css", file, file); err != nil {
+				minified, err := minifier.Bytes("text/css", file.Content)
+
+				if err != nil {
 					return errors.Wrapf(err, "Could not minify file %v", filePath)
 				}
+
+				file.Content = minified
 			}
 		}
 	}
