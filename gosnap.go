@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -43,7 +44,7 @@ func (gsf *GoSnapFile) Write(p []byte) (n int, err error) {
 func (gsf *GoSnapFile) Read(p []byte) (n int, err error) {
 	copy(p, gsf.Content)
 
-	return len(p), nil
+	return len(p), io.EOF
 }
 
 type FileMapType map[string]*GoSnapFile
