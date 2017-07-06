@@ -6,12 +6,15 @@ import (
 	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
+	"mime"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // default permissions for generated files
@@ -31,6 +34,7 @@ type GoSnapFile struct {
 	Content  []byte
 	FileInfo os.FileInfo
 	Data     FrontmatterValueType
+	Headers  http.Header
 }
 
 // Implement io.Writer interface so that plugins can write to the file as if it is a real file
@@ -71,15 +75,6 @@ type GoSnap struct {
 	Plugins     []Plugin
 }
 
-// Optional configurations
-type GoSnapConfig struct {
-	Clean     bool
-	Ignore    []string
-	IgnoreMap StringSet
-	FileMap   FileMapType
-	Plugins   []Plugin
-}
-
 // utility functions for reading
 func TransformToLocalPath(filePath string, source string) string {
 	filePath = path.Clean(filePath)
@@ -112,6 +107,20 @@ func parseFrontmatter(data []byte) ([]byte, FrontmatterValueType, error) {
 	}
 }
 
+func parseHeaders(filePath string, frontmatterValues FrontmatterValueType) http.Header {
+	return http.Header{
+		// these are response headers that seem relevant to static files
+		"Content-Encoding": []string{},
+		"Content-Language": []string{},
+		"Content-Length":   []string{},
+		"Content-Location": []string{},
+		"Content-MD5":      []string{},
+		"Content-Type":     []string{mime.TypeByExtension(filepath.Ext(filePath))},
+		"Last-Modified":    []string{},
+		"Set-Cookie":       []string{},
+	}
+}
+
 var ioUtilReadFile = ioutil.ReadFile
 
 func (gs *GoSnap) ReadFile(path string) (*GoSnapFile, error) {
@@ -122,12 +131,13 @@ func (gs *GoSnap) ReadFile(path string) (*GoSnapFile, error) {
 	}
 
 	content, frontmatterValues, yamlErr := parseFrontmatter(data)
-
 	if yamlErr != nil {
 		return &GoSnapFile{}, errors.Wrapf(yamlErr, "Error parsing YAML in %v", path)
 	}
 
-	return &GoSnapFile{Content: content, Data: frontmatterValues}, nil
+	headers := parseHeaders(path, frontmatterValues)
+
+	return &GoSnapFile{Content: content, Data: frontmatterValues, Headers: headers}, nil
 }
 
 var filepathWalk = filepath.Walk
@@ -169,6 +179,8 @@ func (gs *GoSnap) Read() error {
 			}
 
 			file.FileInfo = fileInfo
+			// Format example: "Mon, 02 Jan 2006 15:04:05 MST"
+			file.Headers.Set("Last-Modified", fileInfo.ModTime().Format(time.RFC1123))
 			gs.FileMap[internalPath] = file
 		}
 
