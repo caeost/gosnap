@@ -3,30 +3,19 @@ package gosnap
 import (
 	"github.com/pkg/errors"
 	"io"
-	"net/http"
 	"os"
 	"reflect"
 	"runtime"
 )
 
-// default permissions for generated files
-// user: read & write
-// group: read
-// other: read
-const (
-	DEFAULT_PERM = os.FileMode(0644)
-)
-
 // All the types its fit to print
 type Plugin func(FileMapType) error
-
-type FrontmatterValueType map[interface{}]interface{}
 
 type GoSnapFile struct {
 	Content  []byte
 	FileInfo os.FileInfo
 	Data     FrontmatterValueType
-	Headers  http.Header
+	Headers  HeaderGetter
 }
 
 // Implement io.Writer interface so that plugins can write to the file as if it is a real file
@@ -55,6 +44,7 @@ type GoSnapFunctionality interface {
 	Write()                       // defined in gosnap_write.go
 	WriteFile(string, GoSnapFile) // defined in gosnap_write.go
 	Use(Plugin)
+	UseAll(...Plugin)
 	Build()
 }
 

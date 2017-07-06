@@ -7,6 +7,14 @@ import (
 	"path"
 )
 
+// default permissions for generated files
+// user: read & write
+// group: read
+// other: read
+const (
+	DEFAULT_PERM = os.FileMode(0644)
+)
+
 var mkdirAll = os.MkdirAll
 var ioUtilWriteFile = ioutil.WriteFile
 

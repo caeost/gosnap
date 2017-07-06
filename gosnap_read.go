@@ -14,6 +14,10 @@ import (
 	"time"
 )
 
+type FrontmatterValueType map[interface{}]interface{}
+
+type HeaderGetter func() http.Header
+
 // utility functions for reading
 func TransformToLocalPath(filePath string, source string) string {
 	filePath = path.Clean(filePath)
@@ -46,17 +50,19 @@ func parseFrontmatter(data []byte) ([]byte, FrontmatterValueType, error) {
 	}
 }
 
-func parseHeaders(filePath string, frontmatterValues FrontmatterValueType) http.Header {
-	return http.Header{
-		// these are response headers that seem relevant to static files
-		"Content-Encoding": []string{},
-		"Content-Language": []string{},
-		"Content-Length":   []string{},
-		"Content-Location": []string{},
-		"Content-MD5":      []string{},
-		"Content-Type":     []string{mime.TypeByExtension(filepath.Ext(filePath))},
-		"Last-Modified":    []string{},
-		"Set-Cookie":       []string{},
+func parseHeaders(filePath string, frontmatterValues FrontmatterValueType) HeaderGetter {
+	return func() http.Header {
+		return http.Header{
+			// these are response headers that seem relevant to static files
+			"Content-Encoding": []string{},
+			"Content-Language": []string{},
+			"Content-Length":   []string{},
+			"Content-Location": []string{},
+			"Content-MD5":      []string{},
+			"Content-Type":     []string{mime.TypeByExtension(filepath.Ext(filePath))},
+			"Last-Modified":    []string{},
+			"Set-Cookie":       []string{},
+		}
 	}
 }
 
@@ -105,7 +111,7 @@ func (gs *GoSnap) Read() error {
 
 	readVisitor := func(filePath string, fileInfo os.FileInfo, err error) error {
 		if err != nil {
-			return errors.Wrapf(err, "Filesystem walk error found at %v", filePath)
+			return errors.Wrapf(err, "Filesystem walk error at %v", filePath)
 		}
 
 		if _, ignored := gs.IgnoreMap[filePath]; !ignored && fileInfo != nil && !fileInfo.IsDir() {
@@ -119,7 +125,7 @@ func (gs *GoSnap) Read() error {
 
 			file.FileInfo = fileInfo
 			// Format example: "Mon, 02 Jan 2006 15:04:05 MST"
-			file.Headers.Set("Last-Modified", fileInfo.ModTime().Format(time.RFC1123))
+			file.Headers().Set("Last-Modified", fileInfo.ModTime().Format(time.RFC1123))
 			gs.FileMap[internalPath] = file
 		}
 
