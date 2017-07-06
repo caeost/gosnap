@@ -82,7 +82,7 @@ func Run(fileMap FileMapType, plugins []Plugin) error {
 		pluginName := getFunctionName(plugin)
 
 		if err := plugin(fileMap); err != nil {
-			return errors.Wrapf(err, "Exiting because of problem in plugin %v", pluginName)
+			return errors.Wrapf(err, "Error in plugin %v", pluginName)
 		}
 	}
 
