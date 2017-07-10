@@ -1,6 +1,8 @@
 package gosnap
 
 import (
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -89,7 +91,7 @@ func TestReadFile(t *testing.T) {
 
 	for i, test := range readFileTests {
 		index = i
-		site := GoSnap{}
+		site := GoSnap{Logger: log.New(ioutil.Discard, "discard", log.Ldate)}
 
 		file, err := site.ReadFile(test.path)
 
@@ -232,7 +234,7 @@ func TestRead(t *testing.T) {
 	for i, test := range readTests {
 		index = i
 
-		site := GoSnap{
+		site := GoSnap{Logger: log.New(ioutil.Discard, "discard", log.Ldate),
 			Source: "dir",
 		}
 
@@ -322,7 +324,7 @@ func TestWriteFile(t *testing.T) {
 	for i, test := range writeFileTests {
 		index = i
 
-		site := GoSnap{
+		site := GoSnap{Logger: log.New(ioutil.Discard, "discard", log.Ldate),
 			Destination: test.destination,
 		}
 
@@ -406,7 +408,7 @@ func TestWrite(t *testing.T) {
 	for i, test := range writeTests {
 		index = i
 
-		site := GoSnap{
+		site := GoSnap{Logger: log.New(ioutil.Discard, "discard", log.Ldate),
 			FileMap:     test.fileMap,
 			Destination: "/out",
 		}
@@ -478,7 +480,7 @@ func containsSamePlugins(a []Plugin, b []Plugin) bool {
 
 func TestUse(t *testing.T) {
 	for i, test := range useTests {
-		site := GoSnap{}
+		site := GoSnap{Logger: log.New(ioutil.Discard, "discard", log.Ldate)}
 
 		if test.initial != nil {
 			site.Plugins = test.initial
@@ -612,7 +614,7 @@ func TestBuild(t *testing.T) {
 	for i, test := range buildTests {
 		index = i
 
-		site := GoSnap{
+		site := GoSnap{Logger: log.New(ioutil.Discard, "discard", log.Ldate),
 			Source:      "/dir",
 			Destination: "/out",
 			Plugins:     test.plugins,
