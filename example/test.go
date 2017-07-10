@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/caeost/gosnap"
-	"github.com/caeost/gosnap/plugins"
+	"log"
 	"os"
 	"path"
 	"runtime"
+
+	"github.com/caeost/gosnap"
+	"github.com/caeost/gosnap/plugins"
 )
 
 func whatKey(fileMap gosnap.FileMapType) error {
@@ -19,7 +21,7 @@ func whatKey(fileMap gosnap.FileMapType) error {
 	return nil
 }
 
-func main() {
+func getDirectory() string {
 	_, filename, _, ok := runtime.Caller(0)
 
 	if !ok {
@@ -27,12 +29,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	directory := path.Dir(filename)
+	return path.Dir(filename)
+}
+
+func main() {
+	directory := getDirectory()
 
 	site := gosnap.GoSnap{
 		Source:      path.Join(directory, "source"),
 		Destination: path.Join(directory, "destination"),
 		Clean:       true,
+		Logger:      log.New(os.Stderr, "Snap: ", log.Lshortfile|log.Ldate|log.Ltime),
 	}
 
 	site.Use(whatKey)

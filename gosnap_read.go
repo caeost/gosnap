@@ -2,8 +2,7 @@ package gosnap
 
 import (
 	"bytes"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
+	"crypto/md5"
 	"io/ioutil"
 	"mime"
 	"net/http"
@@ -12,6 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 )
 
 type FrontmatterValueType map[interface{}]interface{}
@@ -50,18 +52,18 @@ func parseFrontmatter(data []byte) ([]byte, FrontmatterValueType, error) {
 	}
 }
 
-func parseHeaders(filePath string, frontmatterValues FrontmatterValueType) HeaderGetter {
+func parseHeaders(filePath string, contents []byte, frontmatterValues FrontmatterValueType) HeaderGetter {
 	return func() http.Header {
+		sum := md5.Sum(contents)
+
 		return http.Header{
 			// these are response headers that seem relevant to static files
 			"Content-Encoding": []string{},
 			"Content-Language": []string{},
 			"Content-Length":   []string{},
-			"Content-Location": []string{},
-			"Content-MD5":      []string{},
+			"Content-MD5":      []string{string(sum[:])},
 			"Content-Type":     []string{mime.TypeByExtension(filepath.Ext(filePath))},
 			"Last-Modified":    []string{},
-			"Set-Cookie":       []string{},
 		}
 	}
 }
@@ -80,7 +82,7 @@ func (gs *GoSnap) ReadFile(path string) (*GoSnapFile, error) {
 		return &GoSnapFile{}, errors.Wrapf(yamlErr, "Error parsing YAML in %v", path)
 	}
 
-	headers := parseHeaders(path, frontmatterValues)
+	headers := parseHeaders(path, content, frontmatterValues)
 
 	return &GoSnapFile{Content: content, Data: frontmatterValues, Headers: headers}, nil
 }

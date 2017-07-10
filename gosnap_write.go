@@ -1,10 +1,11 @@
 package gosnap
 
 import (
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"path"
+
+	"github.com/pkg/errors"
 )
 
 // default permissions for generated files

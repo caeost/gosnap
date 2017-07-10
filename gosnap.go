@@ -1,11 +1,13 @@
 package gosnap
 
 import (
-	"github.com/pkg/errors"
 	"io"
+	"log"
 	"os"
 	"reflect"
 	"runtime"
+
+	"github.com/pkg/errors"
 )
 
 // All the types its fit to print
@@ -41,6 +43,8 @@ type StringSet map[string]struct{}
 type GoSnapFunctionality interface {
 	Read()                        // defined in gosnap_read.go
 	ReadFile(string, os.FileInfo) // defined in gosnap_read.go
+	Ignore(string)                // defined in gosnap_read.go
+	IgnoreAll(...string)          // defined in gosnap_read.go
 	Write()                       // defined in gosnap_write.go
 	WriteFile(string, GoSnapFile) // defined in gosnap_write.go
 	Use(Plugin)
@@ -56,6 +60,7 @@ type GoSnap struct {
 	IgnoreMap   StringSet
 	FileMap     FileMapType
 	Plugins     []Plugin
+	*log.Logger
 }
 
 func (gs *GoSnap) Use(plugin Plugin) {
@@ -90,21 +95,22 @@ func Run(fileMap FileMapType, plugins []Plugin) error {
 }
 
 func (gs *GoSnap) Build() (err error) {
-	// read all files into map
+	gs.Print("read all files into map")
 	err = gs.Read()
+	gs.Printf("read %v files", len(gs.FileMap))
 
 	if err != nil {
 		return errors.Wrap(err, "Build failed at read step")
 	}
 
-	// run files through plugins
+	gs.Print("run files through plugins")
 	err = Run(gs.FileMap, gs.Plugins)
 
 	if err != nil {
 		return errors.Wrap(err, "Build failed during plugin run")
 	}
 
-	// write out new files
+	gs.Printf("write out %v files", len(gs.FileMap))
 	err = gs.Write()
 
 	if err != nil {
